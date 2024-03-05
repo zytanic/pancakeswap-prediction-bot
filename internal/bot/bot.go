@@ -4,18 +4,18 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"math/big"
+	"strings"
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/kallydev/pancakeswap-prediction-bot/contract/pancakeswap"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
-	"math/big"
-	"strings"
-	"time"
 )
 
 type Bot struct {
@@ -29,9 +29,12 @@ type Bot struct {
 	privateKey         *ecdsa.PrivateKey
 }
 
+var currentround *big.Int = big.NewInt(0)
+
 func (b *Bot) Run() error {
 	var first = true
 	for {
+
 		if first {
 			first = false
 		} else {
@@ -52,6 +55,25 @@ func (b *Bot) Run() error {
 		}
 		logrus.Infof("Current epoch %d\n", currentEpoch)
 		round, err := b.predictionContract.Round(&bind.CallOpts{}, currentEpoch)
+		minusOne := new(big.Int).SetInt64(1)
+		result := new(big.Int).Sub(currentEpoch, minusOne)
+		nigga := currentround.Cmp(result)
+		logrus.Infof("Current Betted Round %d,%d\n", result, nigga)
+		if nigga == 0 {
+			logrus.Infof("test")
+			go func() {
+				for {
+					round, err := b.predictionContract.Round(&bind.CallOpts{}, currentround)
+					if err != nil {
+						logrus.Errorln(err)
+						return
+					}
+
+					logrus.Infof("Round Information:\nLock Price: %d\nBull Amount: %d\nBear Amount: %d\n?: %d", round.LockPrice, round.BullAmount, round.BearAmount, round.LockTimestamp)
+					time.Sleep(time.Second * 5)
+				}
+			}()
+		}
 		if err != nil {
 			logrus.Errorln(err)
 			continue
@@ -72,21 +94,23 @@ func (b *Bot) Run() error {
 				continue
 			}
 			var transaction *types.Transaction
-			amount := big.NewInt(int64(b.config.Amount * params.Ether))
+			//amount := big.NewInt(int64(b.config.Amount * params.Ether))
 			if round.BullAmount.Cmp(round.BearAmount) == 1 {
 				logrus.Infof("Bet bull %f BNB\n", b.config.Amount)
-				transaction, err = b.predictionContract.BetBull(b.newTransactOption(amount), currentEpoch)
-				if err != nil {
+				currentround = currentEpoch
+				//transaction, err = b.predictionContract.BetBull(b.newTransactOption(amount), currentEpoch)
+				/*if err != nil {
 					logrus.Errorln(err)
 					continue
-				}
+				}*/
 			} else {
 				logrus.Infof("Bet bear %f BNB\n", b.config.Amount)
-				transaction, err = b.predictionContract.BetBear(b.newTransactOption(amount), currentEpoch)
-				if err != nil {
+				currentround = currentEpoch
+				//transaction, err = b.predictionContract.BetBear(b.newTransactOption(amount), currentEpoch)
+				/*if err != nil {
 					logrus.Errorln(err)
 					continue
-				}
+				}*/
 			}
 			if transaction == nil {
 				continue
