@@ -4,15 +4,19 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/webhook"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/kallydev/pancakeswap-prediction-bot/contract/pancakeswap"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
@@ -68,8 +72,20 @@ func (b *Bot) Run() error {
 						logrus.Errorln(err)
 						return
 					}
+					var url = "https://discord.com/api/webhooks/1215039636355940422/x57nhkbe2JCZ4FmM5LjEZebr4a5gCARsnOUQDWl1xGj10-CzOmJnG9_ejTv1dQk9M0rr"
+					client, err := webhook.NewWithURL(url)
+					if err != nil {
+						logrus.Errorln(err)
+					}
+					bear, _ := new(big.Float).SetInt(round.BearAmount).Float64()
+					bull, _ := new(big.Float).SetInt(round.BearAmount).Float64()
+					lockprice, _ := new(big.Float).SetInt(round.LockPrice).Float64()
+					_, err = client.CreateMessage(discord.WebhookMessageCreate{Content: fmt.Sprintf("Round Information:\nLock Price: %d\nBull Amount: %f\nBear Amount: %f\n?: %d", lockprice/params.Ether, bull/params.Ether, bear/params.Ether, round.LockTimestamp)})
+					if err != nil {
+						logrus.Errorln(err)
+					}
 
-					logrus.Infof("Round Information:\nLock Price: %d\nBull Amount: %d\nBear Amount: %d\n?: %d", round.LockPrice, round.BullAmount, round.BearAmount, round.LockTimestamp)
+					//logrus.Infof("Round Information:\nLock Price: %d\nBull Amount: %d\nBear Amount: %d\n?: %d", round.LockPrice, round.BullAmount / params.Ether, round.BearAmount, round.LockTimestamp)
 					time.Sleep(time.Second * 5)
 				}
 			}()
